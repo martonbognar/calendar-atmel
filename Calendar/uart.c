@@ -4,67 +4,34 @@
 #include <string.h>
 #include "uart.h"
 
-// konstans definiciok
-
-//length of UART input buffer
 #define serin_lng (unsigned char)16
-//length of UART output buffer
-#define sero_lng  (unsigned char)64
-
-// globalis valtozo deklaraciok
 
 unsigned char dumy;
 
 static unsigned char  SER_IN[serin_lng]; /* input buffer */
-static unsigned char  SER_OU[sero_lng];  /* output buffer */
 
 unsigned char  *seribuf; /* cyclic input buffer */
 volatile unsigned char  wp;                      /* write pointer */
 volatile unsigned char  rp;                      /* read pointer */
 volatile unsigned char  sin_num;                 /* data number in input buffer */
-unsigned char  *serobuf; /* outpput buffer */
-volatile volatile unsigned char  trp;
-volatile unsigned char TR_END;                  /* serial output finished */
 
-char  serou_leng;
-
-unsigned char  work;
-unsigned int  wwork;
-
-
-// CLK: MHz
-void USART0_Init(unsigned int baud_set_value,unsigned char dspeed)
-{
-	/* Set baud rate */
-
+void USART0_Init(unsigned int baud_set_value) {
 	UBRR0H = (unsigned char)(baud_set_value>>8);
 	UBRR0L = (unsigned char)baud_set_value;
 
-	if( dspeed)
-	{
-		UCSR0A = 1 << U2X0;
-	}
-	else
-	{
-		UCSR0A = 0x00;
-	}
+	UCSR0A = 0x00;
 
 	UCSR0C = (1<<UCSZ01)|(1<<UCSZ00); // 8 bit adat 1 stop bit
 	UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<< RXCIE0); // tr. & rec en, rec. IT en.
-
-	TR_END = 1;
 
 	sin_num = 0;
 	wp=0;
 	rp=0;
 	seribuf = &SER_IN[0];
-	trp = 0;
-	serobuf = &SER_OU[0];
 }
 
-
 static volatile unsigned char uart_err;
-//receiver IT
+
 ISR(USART_RX_vect) 		// vételi interrupt rutin
 {
 	char dumy;
@@ -93,9 +60,6 @@ ISR(USART_RX_vect) 		// vételi interrupt rutin
 	}
 }
 
-
-// bufferbol olvaso rutin
-//unsigned char GET_UART(void)
 unsigned char GET_UART(unsigned char * UARTvar)
 {
 	if (sin_num>0)

@@ -180,6 +180,9 @@ void processCommand(char command[256]) {
 	if (strcmp(type, "tim") == 0) {
 		updateCurrentTime(command);
 	}
+	if (strcmp(type, "led") == 0) {
+		PORTB ^= 1 << LED_OUT;
+	}
 }
 
 #define BAUD (long)9600
@@ -193,11 +196,11 @@ int main() {
 	PORTB &= ~(1 << LED_OUT);
 
 		unsigned char UART_data;
-		char str[16];
-		double d_var;
-		int i_var,brightness;
+		uint8_t index = 0;
+		char str[16 + 1];
+		bool receivedCommand = false;
 
-		USART0_Init(UBRR_VALUE, 0);
+		USART0_Init(UBRR_VALUE);
 		sei(); // IT enable
 
 	bool button1 = false;
@@ -205,8 +208,23 @@ int main() {
 
 	displayEvent();
 	while (1) {
+		receivedCommand = false;
+		if (GET_UART(&UART_data)) {
+			if (UART_data == '\r') {
+				receivedCommand = true;
+				str[index] = '\0';
+				index = 0;
+			} else {
+				str[index++] = UART_data;
+			}
+		}
+
 		button1 = (PINB & (1 << BUTTON1_IN)) && !button1;
 		button2 = (PINB & (1 << BUTTON2_IN)) && !button2;
+
+		if (receivedCommand) {
+			processCommand(str);
+		}
 
 		if (button1) {
 			pushButton1();
@@ -215,10 +233,6 @@ int main() {
 
 		if (button2) {
 			pushButton2();
-			PORTB ^= 1 << LED_OUT;
-		}
-
-		if (GET_UART(&UART_data)) {
 			PORTB ^= 1 << LED_OUT;
 		}
 	}
