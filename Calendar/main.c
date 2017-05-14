@@ -1,9 +1,11 @@
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
 #include "event.h"
+#include "uart.h"
 
 typedef enum {
 	DISPLAY_STARTTIME,
@@ -42,7 +44,7 @@ void removeAndReorder(uint8_t index);
 void processCommand(char command[256]);
 
 void updateCurrentTime(char command[256]) {
-	sscanf(command, "tim %u", &currentTime);
+	sscanf(command, "tim %lu", &currentTime);
 	setLedStatus();
 	displayEvent();
 }
@@ -82,11 +84,11 @@ bool oneEventIsNear(void) {
 }
 
 void printTopRow(char text[17]) {
-	printf("%s\n", text);
+	//printf("%s\n", text);
 }
 
 void printBottomRow(char text[17]) {
-	printf("%s\n", text);
+	//printf("%s\n", text);
 }
 
 void displayEvent(void) {
@@ -120,8 +122,6 @@ Event processBuilderString(char command[256]) {
 
 	while (temp != NULL) {
 
-		printf("%s", temp);
-		printf("\n");
 		strcpy(data[i++], temp);
 		temp = strtok(NULL, ";");
 
@@ -131,10 +131,10 @@ Event processBuilderString(char command[256]) {
 	strcpy(event.name, data[0]);
 	strcpy(event.startString, data[1]);
 	uint32_t startTime;
-	sscanf(data[2], "%u", &startTime);
+	sscanf(data[2], "%lu", &startTime);
 	event.startTime = startTime;
 	uint32_t notifyMinutes;
-	sscanf(data[3], "%u", &notifyMinutes);
+	sscanf(data[3], "%lu", &notifyMinutes);
 	event.notifyMinutes = notifyMinutes;
 	return event;
 }
@@ -144,8 +144,6 @@ Event processBuilderString(char command[256]) {
 bool addEvent(char command[256]) {
 	if (eventCount == 16)
 	return false;
-
-	printf("COmmand: %s\n", command);
 
 	events[eventCount++] = processBuilderString(command + 4);
 	return true;
@@ -184,53 +182,44 @@ void processCommand(char command[256]) {
 	}
 }
 
+#define BAUD (long)9600
+#define Fcpu 16000000
+#define UBRR_VALUE  (unsigned int)((Fcpu/(16*BAUD)-1) & 0x0fff)
+
 int main() {
 	DDRB |= 1 << LED_OUT;
 	DDRB &= ~(1 << BUTTON1_IN);
 	DDRB &= ~(1 << BUTTON2_IN);
 	PORTB &= ~(1 << LED_OUT);
-	
-	bool button1;
-	bool button2;
-	
+
+		unsigned char UART_data;
+		char str[16];
+		double d_var;
+		int i_var,brightness;
+
+		USART0_Init(UBRR_VALUE, 0);
+		sei(); // IT enable
+
+	bool button1 = false;
+	bool button2 = false;
+
 	displayEvent();
 	while (1) {
-		button1 = PINB & (1 << BUTTON1_IN) && !button1;
-		button2 = PINB & (1 << BUTTON2_IN) && !button2;
-		
+		button1 = (PINB & (1 << BUTTON1_IN)) && !button1;
+		button2 = (PINB & (1 << BUTTON2_IN)) && !button2;
+
 		if (button1) {
 			pushButton1();
+			PORTB ^= 1 << LED_OUT;
 		}
-		
+
 		if (button2) {
 			pushButton2();
+			PORTB ^= 1 << LED_OUT;
+		}
+
+		if (GET_UART(&UART_data)) {
+			PORTB ^= 1 << LED_OUT;
 		}
 	}
-	return 0;
 }
-
-
-
-
-
-
-int main(void)
-{
-
-	
-    while (1) 
-    {
-		bool button1 = PINB & (1 << BUTTON1_IN);
-		bool button2 = PINB & (1 << BUTTON2_IN);
-		
-		bool led = PINB & (1 << LED_OUT);
-		
-		if ((button1 && !led) || (button2 && led)) {
-			PORTB ^= 1 << LED_OUT;
-			led = ~led;
-		}
-			
-    }
-}
-
-
