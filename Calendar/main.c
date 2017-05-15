@@ -1,5 +1,11 @@
 #define F_CPU 16000000UL
 
+#define BAUD (long)9600
+#define UBRR_VALUE  (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
+
+#define rs PB0    //pin8
+#define en PB1    //pin9
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
@@ -22,9 +28,9 @@ typedef enum {
 } CommandType;
 
 enum {
-	LED_OUT = 0,
-	BUTTON1_IN = 1,
-	BUTTON2_IN = 2,
+	LED_OUT = 2,
+	BUTTON1_IN = 3,
+	BUTTON2_IN = 4,
 };
 
 static uint8_t currentEvent = 0;
@@ -89,10 +95,16 @@ bool oneEventIsNear(void) {
 
 void printTopRow(char text[17]) {
 	//printf("%s\n", text);
+	_delay_ms(200);
+	setCursor(0, 0);
+	Send_A_String(text);
 }
 
 void printBottomRow(char text[17]) {
 	//printf("%s\n", text);
+	_delay_ms(200);
+	setCursor(1, 0);
+	Send_A_String(text);
 }
 
 void displayEvent(void) {
@@ -189,14 +201,12 @@ void processCommand(char command[256]) {
 	}
 }
 
-#define BAUD (long)9600
-#define UBRR_VALUE  (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
-
-#define rs PB0    //pin8
-#define en PB1    //pin9
-
 int main() {
-	/*
+
+	DDRB = 0x03;
+	DDRD = 0xF0;
+
+
 	DDRB |= 1 << LED_OUT;
 	DDRB &= ~(1 << BUTTON1_IN);
 	DDRB &= ~(1 << BUTTON2_IN);
@@ -208,11 +218,16 @@ int main() {
 		bool receivedCommand = false;
 
 		USART0_Init(UBRR_VALUE);
-		LCD_init();
-		sei(); // IT enable
+
+		_delay_ms(200);
+		start();
+		sei();
 
 	bool button1 = false;
 	bool button2 = false;
+
+	_delay_ms(200);
+	clearScreen();
 
 	displayEvent();
 
@@ -237,29 +252,10 @@ int main() {
 
 		if (button1) {
 			pushButton1();
-			PORTB ^= 1 << LED_OUT;
 		}
 
 		if (button2) {
 			pushButton2();
-			PORTB ^= 1 << LED_OUT;
 		}
 	}
-	*/
-		DDRB = 0x03;
-		DDRD = 0xF0;
-
-		_delay_ms(200);
-		start();
-
-		while(1)
-		{
-			_delay_ms(200);
-			clearScreen();
-			Send_A_String("Send_A_String()");
-			_delay_ms(200);
-			setCursor(1, 0);
-			Send_A_String("test");
-		}
-		return 0;
 }
