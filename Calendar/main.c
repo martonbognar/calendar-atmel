@@ -6,6 +6,7 @@
 #include <string.h>
 #include "event.h"
 #include "uart.h"
+#include "lcd.h"
 
 typedef enum {
 	DISPLAY_STARTTIME,
@@ -201,12 +202,14 @@ int main() {
 		bool receivedCommand = false;
 
 		USART0_Init(UBRR_VALUE);
+		LCD_init();
 		sei(); // IT enable
 
 	bool button1 = false;
 	bool button2 = false;
 
 	displayEvent();
+	LCD_write_str("  UART sample   ",line1);
 	while (1) {
 		receivedCommand = false;
 		if (GET_UART(&UART_data)) {
