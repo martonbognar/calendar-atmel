@@ -1,13 +1,25 @@
 #ifndef lcd_h
 #define lcd_h
 
-#define line1 1
-#define line2 2
-#define left 0
-#define right 1
-//functions to use
-extern void Delaysw(long t);
-extern void LCD_init(void);							// Initialisation must call after enabled IT
-extern void LCD_write_str(char * s, unsigned char line);		//write string to lcd
+void start();
+void command(char);
+void data(char);
+void Send_A_String(char *StringOfCharacters);
+void cut(char *str);
+void Send_An_Integer(int x);
+void setCursor(int row,int column);
+void clearScreen();
+void home();
+void cursor();
+void noCursor();
+void blink();
+void noBlink();
+void display();
+void noDisplay();
+void scrollDisplayLeft();
+void scrollDisplayRight();
+void autoscroll();
+void noAutoscroll();
+void createChar(int num,unsigned int *charArray);
 
 #endif

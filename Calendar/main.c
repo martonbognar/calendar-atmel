@@ -1,5 +1,8 @@
+#define F_CPU 16000000UL
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/delay.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
@@ -187,10 +190,13 @@ void processCommand(char command[256]) {
 }
 
 #define BAUD (long)9600
-#define Fcpu 16000000
-#define UBRR_VALUE  (unsigned int)((Fcpu/(16*BAUD)-1) & 0x0fff)
+#define UBRR_VALUE  (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
+
+#define rs PB0    //pin8
+#define en PB1    //pin9
 
 int main() {
+	/*
 	DDRB |= 1 << LED_OUT;
 	DDRB &= ~(1 << BUTTON1_IN);
 	DDRB &= ~(1 << BUTTON2_IN);
@@ -209,7 +215,7 @@ int main() {
 	bool button2 = false;
 
 	displayEvent();
-	LCD_write_str("  UART sample   ",line1);
+
 	while (1) {
 		receivedCommand = false;
 		if (GET_UART(&UART_data)) {
@@ -239,4 +245,21 @@ int main() {
 			PORTB ^= 1 << LED_OUT;
 		}
 	}
+	*/
+		DDRB = 0x03;
+		DDRD = 0xF0;
+
+		_delay_ms(200);
+		start();
+
+		while(1)
+		{
+			_delay_ms(200);
+			clearScreen();
+			Send_A_String("Send_A_String()");
+			_delay_ms(200);
+			setCursor(1, 0);
+			Send_A_String("test");
+		}
+		return 0;
 }

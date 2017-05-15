@@ -1,204 +1,302 @@
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <stdlib.h>
-#include <string.h>
-#include "spi.h"
+#define F_CPU 16000000UL
+#include<avr/io.h>
+#include<util/delay.h>
+#include<string.h>
+#include<stdlib.h>
 #include "lcd.h"
+//D4-D7 connected to D4-D7
 
-//PORTC
-#define SS_LCD 3
-#define SET_SS_LCD PORTC |= (1 << SS_LCD)
-#define CLR_SS_LCD PORTC &= ~(1 << SS_LCD)
+#define rs PB0    //pin8
+#define en PB1    //pin9
 
-volatile int LCD_WR_RDY;
-volatile int StrIndex;
-volatile char * StrPtr;
-volatile char ITstr [20];
-volatile unsigned char LCDline;
-volatile unsigned char LCDpos;
 
-static char tmpstr1[20];
-static char tmpstr2[20];
 
-void LCD_DATA(char data);
-void SetLineAndPos(unsigned char line, unsigned char pos);
+int base_address[8]={64,72,80,88,96,104,112,120};
 
-// t[msec]
-void Delaysw(long t)
+void start()
 {
-	t = (long)(160*(float)t);
-	for(long i = 0; i<t; i++)
-	{
-		char tmp =	PORTD;
+	DDRB = 0x03;    // PB0 and PB1 declared as output
+	DDRD = 0xF0;    // PD4,PD5,PD6,PD7 declared as output
+	command(0x28);	// To initialize LCD in 2 lines, 5X8 dots and 4bit mode.
+	command(0x0C);	// Display ON cursor OFF. E for cursor ON and C for cursor OFF
+	command(0x06);	// Entry mode-increment cursor by 1
+	command(0x01);	// Clear screen
+	command(0x80);	// Sets cursor to (0,0)
+}
+
+
+
+
+void command(char LcdCommand)  // Basic function used in giving command
+{                              // to LCD
+	char UpperHalf, LowerHalf;
+
+	UpperHalf = LcdCommand & 0xF0;	// upper 4 bits of command
+	PORTD &= 0x0F;                  // flushes upper half of PortD to 0, but retains lower half of PortD
+	PORTD |= UpperHalf;
+	PORTB &= ~(1<<rs);
+	PORTB |= (1<<en);
+	_delay_ms(10);
+	PORTB &= ~(1<<en);
+	_delay_ms(10);
+
+	LowerHalf = ((LcdCommand<<4) & 0xF0); //lower 4 bits of command
+	PORTD &= 0x0F;                  // flushes upper half of PortD to 0, but retains lower half of PortD
+	PORTD |= LowerHalf;
+	PORTB &= ~(1<<rs);
+	PORTB |= (1<<en);
+	_delay_ms(10);
+	PORTB &= ~(1<<en);
+	_delay_ms(10);
+}
+
+void data(char AsciiChar)    // Basic function used in giving data
+{                            // to LCD
+	char UpperHalf, LowerHalf;
+
+	UpperHalf = AsciiChar & 0xF0;	// upper 4 bits of data
+	PORTD &= 0x0F;       // flushes upper half of PortD to 0, but retains lower half of PortD
+	PORTD |= UpperHalf;
+	PORTB |= (1<<rs);
+	PORTB |= (1<<en);
+	_delay_ms(10);
+	PORTB &= ~(1<<en);
+	_delay_us(400);
+
+	LowerHalf = ((AsciiChar<<4) & 0xF0); //lower 4 bits of data
+	PORTD &= 0x0F;       // flushes upper half of PortD to 0, but retains lower half of PortD
+	PORTD |= LowerHalf;
+	PORTB |= (1<<rs);
+	PORTB |= (1<<en);
+	_delay_ms(10);
+	PORTB &= ~(1<<en);
+	_delay_us(400);
+}
+
+
+
+
+void Send_A_String(char *StringOfCharacters)     // Takes input a string and displays it
+{                                                // max character in a string should be
+	while(*StringOfCharacters > 0)           // less than 16, after 16th character
+	{                                        // everything will be ignored.
+		data(*StringOfCharacters++);
 	}
 }
 
 
-//D7 D6 D5 D4 RS E X X
-#define RS 0x08
-#define E 0x04
-
-#define CLR_DISP 0x01
-#define CR 0x02
-#define CGRAM_ADDR 0x40
-#define DDRAM_ADDR 0x80
-#define LINE1 DDRAM_ADDR
-#define LINE2 (DDRAM_ADDR | 0x40)
-
-//write to shiftregister + register connected to LCD interface
-void LCD_REG_WR(unsigned char data)
-{
-	CLR_SS_LCD;
-	SPI_MasterTransmit(data);	//write to shiftregister
-	SET_SS_LCD;					//write content of shr to reg
-}
-
-// write one half of LCD command
-void LCD_COMM_HALF(unsigned char com4bits)
-{
-	unsigned char com;
-	com = (com4bits << 4);
-	LCD_REG_WR(com);
-	com = (com4bits << 4) | E;
-	LCD_REG_WR(com);
-	com = (com4bits << 4);
-	LCD_REG_WR(com);
-}
-
-// write LCD command
-void LCD_COMM(unsigned char com)
-{
-	unsigned char com_tmp;
-	com_tmp = com >> 4;
-	LCD_COMM_HALF(com_tmp);
-	com_tmp = com & 0x0f;
-	LCD_COMM_HALF(com_tmp);
-}
-
-// write one half of LCD data
-void LCD_DATA_HALF(char data4bits)
-{
-	unsigned char data;
-	data = (data4bits << 4) | RS;
-	LCD_REG_WR(data);
-	data = (data4bits << 4) | RS | E;
-	LCD_REG_WR(data);
-	data = (data4bits << 4) | RS;
-	LCD_REG_WR(data);
-}
-
-// write LCD data
-void LCD_DATA(char data)
-{
-	char data_tmp;
-	data_tmp = data >> 4;		// MSB first
-	LCD_DATA_HALF(data_tmp);
-	data_tmp = data & 0x0f;
-	LCD_DATA_HALF(data_tmp);
-}
-
-
-void LCD_init(void)
-{
-	DDRC |= (1 << SS_LCD);		//SS_LCD direction: out
-	SET_SS_LCD;					//SS_LCD inactive
-	SPI_MasterInit();
-	LCD_WR_RDY = 1;
-	// set 4 bits mode
-	Delaysw(150);
-	LCD_COMM_HALF(0x03);
-	Delaysw(50);
-	LCD_COMM_HALF(0x03);
-	Delaysw(50);
-	LCD_COMM_HALF(0x03);
-	Delaysw(50);
-	LCD_COMM_HALF(0x02);
-	Delaysw(50);
-	// 4 bits mode ready
-	LCD_COMM(0x28);		//function set 0 0 1 DL N F x x   2 lines
-	Delaysw(50);
-	LCD_COMM(0x08);		//display off  0 0 0 0 1 D C B   disp. off, curs. off, blink off
-	Delaysw(50);
-	LCD_COMM(0x01);		//clear and home 0 0 0 0 0 0 0 1
-	Delaysw(50);
-	LCD_COMM(0x0c);		// dp. on, curs. on, blink on
-	Delaysw(50);
-	LCD_COMM(0x06);		// Entry mode 0 0 0 0 0 1 I/D S dp. on, curs. on, blink on
-	Delaysw(50);
-}
-
-//Set LCD line (1 or 2) and pos (0-15) to write
-
-void SetLineAndPos(unsigned char line, unsigned char pos)
-{
-	if(line == 1)
-	{
-		LCD_COMM(LINE1+pos);
-	}
-	else
-	{
-		LCD_COMM(LINE2+pos);
-	}
-}
-
-
-void CLR_DISPLAY(void)
-{
-	LCD_COMM(CLR_DISP);
-}
-
-//copy l pieces of characters
-void cpy_str(char * sd, char * ss, int l)  // sd[l-1:0] = ss[l-1:0]
-{
-	int i;
-	int len;
-	int sl;
-
-	sl = strlen(ss);
-
-	if(l > sl)
-	{
-		len = sl;
-	}
-	else
-	{
-		len = l;
-	}
-
-	for(i=0; i<len; i++)
-	{
-		sd[i] = ss[i];
-	}
-	sd[i]=0;
-}
-
-//complete string shorter then 16 char with space
-void complete_str_n(char * s, int n)
-{
-	int l = strlen(s);
-	if(l < n)
-	{
-		for(int i=0; i<=(n-l); i++ )
+void cut(char *str)                 // It's a souped up version of Send_A_String
+{                                   // It takes a string, if number of characters
+	int i=0;                    // is greater than 16, it moves the cursor to
+	if(strlen(str)<16)          // next line and starts printing there
+	{Send_A_String(str);}       //
+	// It has its own limitations, maximum number
+	else                        // of character is 32, after 32nd character
+	{                           // it'll ignore the rest.
+		while(i<16)
 		{
-			strcat(s," ");
+			data(str[i]);
+			i=i+1;
 		}
+		command(0xC0);
+		while(str[i]!='\0' && i<32)
+		{
+			data(str[i]);
+			i=i+1;
+		}
+
 	}
 }
 
-//write string to LCD line
-void LCD_write_str(char * s, unsigned char line)
-{
-	//char tmpstr[20];
 
-	cpy_str(tmpstr1,s,16);
-	complete_str_n(tmpstr1,16);
-
-	do{} while(!LCD_WR_RDY);
-
-	strcpy(ITstr,tmpstr1);
-	//StrPtr = ITstr;
-	StrIndex = -1;
-	LCDline = line;
-	LCDpos = 0;
-	LCD_WR_RDY = 0;
+void Send_An_Integer(int x)     // Takes an integer as input and displays it
+{                               // value of integer should be in between
+	char buffer[8];         // the range of "int",
+	itoa(x,buffer,10);      //  else it'll print garbage values.
+	Send_A_String(buffer);  // It use Send_A_String() for displaying.
 }
+
+
+
+void setCursor(int row,int column)             // Indexing starts from 0.
+{                                              // Therefore,
+	switch(row)                            // 0<=row<=1 and 0<=column<=15.
+	{                                      //
+		case 0:                        // If arguments are outside the
+		switch(column)         // the specified range, then function
+		{                      // will not work and ignore the values
+			case 0:
+			command(0x80);break;
+			case 1:
+			command(0x81);break;
+			case 2:
+			command(0x82);break;
+			case 3:
+			command(0x83);break;
+			case 4:
+			command(0x84);break;
+			case 5:
+			command(0x85);break;
+			case 6:
+			command(0x86);break;
+			case 7:
+			command(0x87);break;
+			case 8:
+			command(0x88);break;
+			case 9:
+			command(0x89);break;
+			case 10:
+			command(0x8A);break;
+			case 11:
+			command(0x8B);break;
+			case 12:
+			command(0x8C);break;
+			case 13:
+			command(0x8D);break;
+			case 14:
+			command(0x8E);break;
+			case 15:
+			command(0x8F);break;
+			default:
+			break;
+		}
+		break;
+		case 1:
+		switch(column)
+		{
+			case 0:
+			command(0xC0);break;
+			case 1:
+			command(0xC1);break;
+			case 2:
+			command(0xC2);break;
+			case 3:
+			command(0xC3);break;
+			case 4:
+			command(0xC4);break;
+			case 5:
+			command(0xC5);break;
+			case 6:
+			command(0xC6);break;
+			case 7:
+			command(0xC7);break;
+			case 8:
+			command(0xC8);break;
+			case 9:
+			command(0xC9);break;
+			case 10:
+			command(0xCA);break;
+			case 11:
+			command(0xCB);break;
+			case 12:
+			command(0xCC);break;
+			case 13:
+			command(0xCD);break;
+			case 14:
+			command(0xCE);break;
+			case 15:
+			command(0xCF);break;
+			default:
+			break;
+		}
+		break;
+		default:
+		break;
+	}
+
+}
+
+
+
+
+void clearScreen()         // Clears the screen and
+{                          // returns cursor to (0,0) position
+	command(0x01);
+}
+void home()                // Returns cursor to (0,0) position
+{
+	command(0x02);
+}
+
+
+
+void cursor()              // Shows cursor as an underscore
+{
+	command(0x0E);
+}
+void noCursor()            // Hides the cursor
+{
+	command(0x0C);
+}
+
+
+
+void blink()               // Shows cursor as a blinking black spot
+{
+	command(0x0F);
+}
+void noBlink()             // Hides the cursor
+{
+	command(0x0C);
+}
+
+
+
+void display()             // Display ON with Cursor OFF
+{
+	command(0x0C);
+}
+void noDisplay()           // Display OFF
+{
+	command(0x08);
+}
+
+
+
+void scrollDisplayLeft()   // Scrolls the contents of the
+{                          // display(text and cursor) one space to the left
+	command(0x18);
+}
+void scrollDisplayRight()  // Scrolls the contents of the
+{                          // display(text and cursor) one space to the right
+	command(0x1C);
+}
+
+
+
+void autoscroll()          // This causes each character output to the display to push previous
+{                          // characters over by one space in right to left direction
+	command(0x07);
+}
+void noAutoscroll()        // Turns off automatic scrolling of the LCD.
+{
+	command(0x06);
+}
+
+
+
+
+void createChar(int num,unsigned int *charArray)// Takes input two arguments
+{                                               // 1st is a number between 0-7,
+	int i=0;                                // 	which maps to eight base address
+	command(base_address[num]);             // 2nd is an array of 8 integers,
+	while(i<8)                              // 	each integer is formed by 5 bits
+	{                                       // 	which determine the pixels in the
+		data(charArray[i]);             // 	row same as the index of that integer
+		i++;                            //
+	}                                       // Before printing the character, one must
+}                                               // set cursor else cursor won't get printed.
+// To print Created Character, one can use data() function.
+// Just pass a number between 0-7 as an argument in data() function.
+//
+// Example: To print value stored at zero
+// data(0);        CORRECT
+// data('0');      INCORRECT
+
+
+
+
+
+
+
+
