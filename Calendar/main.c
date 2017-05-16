@@ -231,6 +231,16 @@ int main() {
 
 	displayEvent();
 
+	OCR1A = 0x3D08;
+
+	TCCR1B |= (1 << WGM12);
+	// Mode 4, CTC on OCR1A
+
+	TIMSK1 |= (1 << OCIE1A);
+	//Set interrupt on compare match
+
+	TCCR1B |= (1 << CS12) | (1 << CS10);
+
 	while (1) {
 		receivedCommand = false;
 		if (GET_UART(&UART_data)) {
@@ -258,4 +268,11 @@ int main() {
 			pushButton2();
 		}
 	}
+}
+
+// https://sites.google.com/site/qeewiki/books/avr-guide/timers-on-the-atmega328
+ISR (TIMER1_COMPA_vect)
+{
+	// action to be done every 1 sec
+	PORTB ^= 1 << LED_OUT;
 }
