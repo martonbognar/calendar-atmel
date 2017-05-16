@@ -4,7 +4,7 @@
 #include <string.h>
 #include "uart.h"
 
-#define serin_lng (unsigned char)16
+#define serin_lng (unsigned char)128
 
 unsigned char dumy;
 

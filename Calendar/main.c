@@ -36,7 +36,7 @@ enum {
 static uint8_t currentEvent = 0;
 static uint8_t eventCount = 0;
 static Event events[16];
-static DisplayMode displayMode;
+static DisplayMode displayMode = DISPLAY_STARTTIME;
 static uint32_t currentTime = 0;
 
 void updateCurrentTime(char command[256]);
@@ -60,8 +60,10 @@ void updateCurrentTime(char command[256]) {
 }
 
 void pushButton1(void) {
-	if (eventCount == 0)
-	return;
+	if (eventCount == 0) {
+		displayEvent();
+		return;
+	}
 	currentEvent = (currentEvent + 1) % eventCount;
 	displayEvent();
 }
@@ -72,6 +74,7 @@ void pushButton2(void) {
 		} else {
 		displayMode = DISPLAY_STARTTIME;
 	}
+
 	displayEvent();
 }
 
@@ -94,21 +97,21 @@ bool oneEventIsNear(void) {
 }
 
 void printTopRow(char text[17]) {
-	//printf("%s\n", text);
 	_delay_ms(200);
 	setCursor(0, 0);
 	Send_A_String(text);
 }
 
 void printBottomRow(char text[17]) {
-	//printf("%s\n", text);
 	_delay_ms(200);
 	setCursor(1, 0);
 	Send_A_String(text);
 }
 
 void displayEvent(void) {
-	char buffer[17];
+	char buffer[17] = "test";
+
+	clearScreen();
 
 	if (eventCount == 0) {
 		printTopRow("No events");
@@ -116,17 +119,20 @@ void displayEvent(void) {
 		return;
 	}
 
+	printTopRow(events[currentEvent].name);
+
 	switch (displayMode) {
 		case DISPLAY_REMAINING:
-		getTimeRemainingString(events[currentEvent], buffer, currentTime);
-		break;
+			getTimeRemainingString(events[currentEvent], buffer, currentTime);
+			printBottomRow(buffer);
+			PORTB |= 1 << LED_OUT;
+			break;
 		case DISPLAY_STARTTIME:
-		strcpy(buffer, events[currentEvent].startString);
-		break;
+			strcpy(buffer, events[currentEvent].startString);
+			printBottomRow(buffer);
+			PORTB &= ~(1 << LED_OUT);
+			break;
 	}
-
-	printTopRow(events[currentEvent].name);
-	printBottomRow(buffer);
 }
 
 Event processBuilderString(char command[256]) {
@@ -156,23 +162,31 @@ Event processBuilderString(char command[256]) {
 }
 
 // add example cd event;2017-02-03 23:53;1494151200;30
+// add example n2 event;2017-05-16 15:32;1494151200;30
+// rmv example n2 event
 
 bool addEvent(char command[256]) {
 	if (eventCount == 16)
 	return false;
 
 	events[eventCount++] = processBuilderString(command + 4);
+	displayEvent();
 	return true;
 }
 
 bool removeEvent(char command[256]) {
 	bool removed = false;
 	for (uint8_t i = 0; i < eventCount; ++i) {
-		if (strcmp(events[i].name, command)) {
+		if (strcmp(events[i].name, command + 4) == 0) {
 			removeAndReorder(i);
 			removed = true;
 		}
 	}
+
+	if (removed) {
+		displayEvent();
+	}
+
 	return removed;
 }
 
@@ -181,6 +195,9 @@ void removeAndReorder(uint8_t index) {
 		events[i] = events[i + 1];
 	}
 	eventCount--;
+	if (currentEvent >= eventCount) {
+		currentEvent = 0;
+	}
 }
 
 void processCommand(char command[256]) {
@@ -274,5 +291,6 @@ int main() {
 ISR (TIMER1_COMPA_vect)
 {
 	// action to be done every 1 sec
-	PORTB ^= 1 << LED_OUT;
+	// PORTB ^= 1 << LED_OUT;
+	currentTime++;
 }
