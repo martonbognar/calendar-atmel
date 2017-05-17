@@ -2,20 +2,18 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <string.h>
+#include <stdbool.h>
 #include "uart.h"
 
-#define serin_lng (unsigned char)128
+#define bufferSize 128
 
-unsigned char dumy;
+static char inputBuffer[bufferSize];
 
-static unsigned char  SER_IN[serin_lng]; /* input buffer */
-
-unsigned char  *seribuf; /* cyclic input buffer */
 volatile unsigned char  wp;                      /* write pointer */
 volatile unsigned char  rp;                      /* read pointer */
 volatile unsigned char  sin_num;                 /* data number in input buffer */
 
-void uart_init(unsigned int baud_set_value) {
+void uartInit(unsigned int baud_set_value) {
 	UBRR0H = (unsigned char)(baud_set_value>>8);
 	UBRR0L = (unsigned char)baud_set_value;
 
@@ -27,7 +25,6 @@ void uart_init(unsigned int baud_set_value) {
 	sin_num = 0;
 	wp=0;
 	rp=0;
-	seribuf = &SER_IN[0];
 }
 
 static volatile unsigned char uart_err;
@@ -44,33 +41,33 @@ ISR(USART_RX_vect) 		// vételi interrupt rutin
 	{
 		uart_err = 1<<DOR0;
 	}
-	*(seribuf+wp) = UDR0;   // adat a bufferbe
+	*(inputBuffer+wp) = UDR0;   // adat a bufferbe
 	//SER_IN[wp] = UDR1;
-	wp =(wp+1) % serin_lng;	// pointer modulo állítása
-	if (sin_num<serin_lng)	// ha nincs felülírás
+	wp =(wp+1) % bufferSize;	// pointer modulo állítása
+	if (sin_num<bufferSize)	// ha nincs felülírás
 	{
 		sin_num+=1;
 	}
 	else					// ha felülírtuk a legrégebbit
 	{
 		//buf_ovr = 1;	// jelzés, tele a buffer, elvesz a legrégebbi adat!
-		sin_num = serin_lng;
+		sin_num = bufferSize;
 		rp = wp;		// olvasó pointer az író után mutat
 		// mivel mostmár ez a legrégebbi adat
 	}
 }
 
-unsigned char get_uart_character(unsigned char * UARTvar)
+bool getCharacterFromUart(unsigned char * UARTvar)
 {
 	if (sin_num>0)
 	{
-		*UARTvar = *(seribuf+rp);
-		rp = (rp+1) % serin_lng;
+		*UARTvar = *(inputBuffer+rp);
+		rp = (rp+1) % bufferSize;
 		sin_num-=1;
-		return(1);
+		return true;
 	}
 	else
 	{
-		return(0);
+		return false;
 	}
 }

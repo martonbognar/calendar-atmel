@@ -4,7 +4,7 @@
 void lcdInit();
 void setTopRowActive();
 void setBottomRowActive();
-void displayText(char *StringOfCharacters);
+void displayText(char * string);
 void clearScreen();
 
 #endif

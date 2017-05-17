@@ -1,7 +1,9 @@
 #ifndef uart_h
 #define uart_h
 
-void uart_init(unsigned int baud_set_value);
-unsigned char get_uart_character(unsigned char * UARTvar);
+#include <stdbool.h>
+
+void uartInit(unsigned int baud_set_value);
+bool getCharacterFromUart(unsigned char * UARTvar);
 
 #endif

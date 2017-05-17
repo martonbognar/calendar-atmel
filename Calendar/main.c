@@ -245,7 +245,7 @@ int main() {
 	char str[256];
 	bool receivedCommand = false;
 
-	uart_init(UBRR_VALUE);
+	uartInit(UBRR_VALUE);
 	_delay_ms(200);
 	lcdInit();
 	sei();
@@ -267,7 +267,7 @@ int main() {
 	while (1) {
 		receivedCommand = false;
 		// ha erkezett adat, azt feldolgozzuk
-		if (get_uart_character(&UART_data)) {
+		if (getCharacterFromUart(&UART_data)) {
 			if (UART_data == '\r') {
 				// ha megerkezett a lezaro karakter
 				receivedCommand = true;
