@@ -9,5 +9,5 @@ void getTimeRemainingString(Event event, char * buffer, uint32_t currentTime) {
 
 bool eventIsNear(Event event, uint32_t currentTime) {
 	// a masodpercek kulonbseget percce alakitjuk, majd ezt hasonlitjuk
-	return (event.startTime - currentTime) / 60 < event.notifyMinutes;
+	return ((event.startTime - currentTime) / 60) < event.notifyMinutes;
 }

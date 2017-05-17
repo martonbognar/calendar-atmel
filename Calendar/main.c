@@ -1,6 +1,12 @@
 #define BAUD (long)9600
 #define UBRR_VALUE  (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
 
+#define rs PB0
+#define en PB1
+
+#define MAX_EVENTS 8
+#define LINE_LENGTH 17
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "f_cpu.h"
@@ -31,11 +37,14 @@ static uint8_t currentEvent = 0;
 // osszes elemszam
 static uint8_t eventCount = 0;
 // esemenyek tombje
-static Event events[16];
+static Event events[MAX_EVENTS];
 // kivalasztott megjelenitesi mod
 static DisplayMode displayMode = DISPLAY_STARTTIME;
 // aktualis timestamp
 static uint32_t currentTime = 0;
+
+// globalis string buffer
+static char buffer[LINE_LENGTH];
 
 // a fuggvenyek leirasa megtalalhato a dokumentacioban,
 // de igyekeztem mindennek ertelmes neveket adni, hogy konnyen ertheto legyen
@@ -57,17 +66,15 @@ void processCommand(char * command);
 void updateCurrentTime(char * command) {
 	sscanf(command, "tim %lu", &currentTime);
 	setLedStatus();
-	clearScreen();
 	printCurrentTime();
-	displayEvent();
 }
 
 void printCurrentTime(void) {
-	char buf[17];
 	clearScreen();
-	sprintf(buf, "tim: %lu", currentTime);
-	printTopRow(buf);
+	sprintf(buffer, "tim: %lu", currentTime);
+	printTopRow(buffer);
 	_delay_ms(1000);
+	displayEvent();
 }
 
 void pushButton1(void) {
@@ -111,19 +118,17 @@ bool oneEventIsNear(void) {
 
 void printTopRow(char * text) {
 	_delay_ms(200);
-	setCursor(0, 0);
-	Send_A_String(text);
+	setTopRowActive();
+	displayText(text);
 }
 
 void printBottomRow(char * text) {
 	_delay_ms(200);
-	setCursor(1, 0);
-	Send_A_String(text);
+	setBottomRowActive();
+	displayText(text);
 }
 
 void displayEvent(void) {
-	char buffer[17] = "test";
-
 	clearScreen();
 
 	if (eventCount == 0) {
@@ -150,7 +155,7 @@ void displayEvent(void) {
 
 Event processBuilderString(char * command) {
 	char* temp;
-	char data[4][17];
+	char data[4][LINE_LENGTH];
 	uint8_t i = 0;
 
 	// feldolgozzuk a pontosvesszokkel elvalasztott adatokat
@@ -164,19 +169,15 @@ Event processBuilderString(char * command) {
 	Event event;
 	strcpy(event.name, data[0]);
 	strcpy(event.startString, data[1]);
-	uint32_t startTime;
-	sscanf(data[2], "%lu", &startTime);
-	event.startTime = startTime;
-	uint32_t notifyMinutes;
-	sscanf(data[3], "%lu", &notifyMinutes);
-	event.notifyMinutes = notifyMinutes;
+	sscanf(data[2], "%lu", &(event.startTime));
+	sscanf(data[3], "%lu", &(event.notifyMinutes));
 	return event;
 }
 
 bool addEvent(char * command) {
 	// nem adjuk hozza, ha mar nincs hely
-	if (eventCount == 16)
-	return false;
+	if (eventCount == MAX_EVENTS)
+		return false;
 
 	events[eventCount++] = processBuilderString(command + 4);
 	displayEvent();
@@ -241,12 +242,12 @@ int main() {
 
 	unsigned char UART_data;
 	uint8_t index = 0;
-	char str[16 + 1];
+	char str[256];
 	bool receivedCommand = false;
 
 	uart_init(UBRR_VALUE);
 	_delay_ms(200);
-	lcd_init();
+	lcdInit();
 	sei();
 
 	bool button1 = false;
