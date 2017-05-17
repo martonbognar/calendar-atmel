@@ -240,7 +240,7 @@ int main() {
 	DDRB &= ~(1 << BUTTON2_IN);
 	PORTB &= ~(1 << LED_OUT);
 
-	unsigned char UART_data;
+	char UART_data;
 	uint8_t index = 0;
 	char str[256];
 	bool receivedCommand = false;

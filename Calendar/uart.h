@@ -4,6 +4,6 @@
 #include <stdbool.h>
 
 void uartInit(unsigned int baud_set_value);
-bool getCharacterFromUart(unsigned char * UARTvar);
+bool getCharacterFromUart(char * character);
 
 #endif
