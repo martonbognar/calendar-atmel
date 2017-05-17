@@ -1,5 +1,5 @@
-#ifndef CALENDAR_EVENT_H
-#define CALENDAR_EVENT_H
+#ifndef event_h
+#define event_h
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -11,7 +11,7 @@ typedef struct {
 	uint32_t notifyMinutes;
 } Event;
 
-void getTimeRemainingString(Event event, char buffer[17], uint32_t currentTime);
+void getTimeRemainingString(Event event, char * buffer, uint32_t currentTime);
 bool eventIsNear(Event event, uint32_t currentTime);
 
 #endif

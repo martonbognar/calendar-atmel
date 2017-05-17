@@ -1,13 +1,9 @@
-#define F_CPU 16000000UL
-
 #define BAUD (long)9600
 #define UBRR_VALUE  (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
 
-#define rs PB0    //pin8
-#define en PB1    //pin9
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include "f_cpu.h"
 #include <util/delay.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -17,46 +13,61 @@
 #include "uart.h"
 #include "lcd.h"
 
+// megjelenitesi mod
 typedef enum {
 	DISPLAY_STARTTIME,
 	DISPLAY_REMAINING,
 } DisplayMode;
 
-typedef enum {
-	COMMAND_ADD,
-	COMMAND_REMOVE,
-} CommandType;
-
+// periferiak pinjei
 enum {
 	LED_OUT = 2,
 	BUTTON1_IN = 3,
 	BUTTON2_IN = 4,
 };
 
+// kivalasztott elem sorszama
 static uint8_t currentEvent = 0;
+// osszes elemszam
 static uint8_t eventCount = 0;
+// esemenyek tombje
 static Event events[16];
+// kivalasztott megjelenitesi mod
 static DisplayMode displayMode = DISPLAY_STARTTIME;
+// aktualis timestamp
 static uint32_t currentTime = 0;
 
-void updateCurrentTime(char command[256]);
+// a fuggvenyek leirasa megtalalhato a dokumentacioban,
+// de igyekeztem mindennek ertelmes neveket adni, hogy konnyen ertheto legyen
+void updateCurrentTime(char * command);
+void printCurrentTime(void);
 void pushButton1(void);
 void pushButton2(void);
 void setLedStatus(void);
 bool oneEventIsNear(void);
-void printTopRow(char text[17]);
-void printBottomRow(char text[17]);
+void printTopRow(char * text);
+void printBottomRow(char * text);
 void displayEvent(void);
-Event processBuilderString(char command[256]);
-bool addEvent(char command[256]);
-bool removeEvent(char command[256]);
+Event processBuilderString(char * command);
+bool addEvent(char * command);
+bool removeEvent(char * command);
 void removeAndReorder(uint8_t index);
-void processCommand(char command[256]);
+void processCommand(char * command);
 
-void updateCurrentTime(char command[256]) {
+void updateCurrentTime(char * command) {
 	sscanf(command, "tim %lu", &currentTime);
 	setLedStatus();
+	clearScreen();
+	printCurrentTime();
 	displayEvent();
+}
+
+void printCurrentTime(void) {
+	char buf[17];
+	clearScreen();
+	sprintf(buf, "tim: %lu", currentTime);
+	printTopRow(buf);
+	_delay_ms(1000);
 }
 
 void pushButton1(void) {
@@ -80,8 +91,10 @@ void pushButton2(void) {
 
 void setLedStatus(void) {
 	if (oneEventIsNear()) {
+		// ha van kozeli esemeny, bekapcsoljuk a ledet
 		PORTB |= 1 << LED_OUT;
-		} else {
+	} else {
+		// egyebkent ki
 		PORTB &= ~(1 << LED_OUT);
 	}
 }
@@ -96,13 +109,13 @@ bool oneEventIsNear(void) {
 	return isNear;
 }
 
-void printTopRow(char text[17]) {
+void printTopRow(char * text) {
 	_delay_ms(200);
 	setCursor(0, 0);
 	Send_A_String(text);
 }
 
-void printBottomRow(char text[17]) {
+void printBottomRow(char * text) {
 	_delay_ms(200);
 	setCursor(1, 0);
 	Send_A_String(text);
@@ -123,30 +136,29 @@ void displayEvent(void) {
 
 	switch (displayMode) {
 		case DISPLAY_REMAINING:
+			// kiirjuk a hatralevo percek szamat
 			getTimeRemainingString(events[currentEvent], buffer, currentTime);
 			printBottomRow(buffer);
-			PORTB |= 1 << LED_OUT;
 			break;
 		case DISPLAY_STARTTIME:
+			// kiirjuk az elore megadott hataridot
 			strcpy(buffer, events[currentEvent].startString);
 			printBottomRow(buffer);
-			PORTB &= ~(1 << LED_OUT);
 			break;
 	}
 }
 
-Event processBuilderString(char command[256]) {
+Event processBuilderString(char * command) {
 	char* temp;
 	char data[4][17];
 	uint8_t i = 0;
 
+	// feldolgozzuk a pontosvesszokkel elvalasztott adatokat
 	temp = strtok(command, ";");
 
 	while (temp != NULL) {
-
 		strcpy(data[i++], temp);
 		temp = strtok(NULL, ";");
-
 	}
 
 	Event event;
@@ -161,11 +173,8 @@ Event processBuilderString(char command[256]) {
 	return event;
 }
 
-// add example cd event;2017-02-03 23:53;1494151200;30
-// add example n2 event;2017-05-16 15:32;1494151200;30
-// rmv example n2 event
-
-bool addEvent(char command[256]) {
+bool addEvent(char * command) {
+	// nem adjuk hozza, ha mar nincs hely
 	if (eventCount == 16)
 	return false;
 
@@ -174,9 +183,10 @@ bool addEvent(char command[256]) {
 	return true;
 }
 
-bool removeEvent(char command[256]) {
+bool removeEvent(char * command) {
 	bool removed = false;
 	for (uint8_t i = 0; i < eventCount; ++i) {
+		// vizsgaljuk a nevvel valo egyezest
 		if (strcmp(events[i].name, command + 4) == 0) {
 			removeAndReorder(i);
 			removed = true;
@@ -195,13 +205,15 @@ void removeAndReorder(uint8_t index) {
 		events[i] = events[i + 1];
 	}
 	eventCount--;
+	// ha az utolsot toroltuk ki, ne ervenytelen helyre mutasson az index
 	if (currentEvent >= eventCount) {
 		currentEvent = 0;
 	}
 }
 
-void processCommand(char command[256]) {
+void processCommand(char * command) {
 	char type[4];
+	// minden parancs 3 karakteres azonositoval rendelkezik, azt vizsgaljuk
 	strncpy(type, command, 3);
 	type[3] = '\0';
 	if (strcmp(type, "add") == 0) {
@@ -216,60 +228,57 @@ void processCommand(char command[256]) {
 	if (strcmp(type, "led") == 0) {
 		PORTB ^= 1 << LED_OUT;
 	}
+	if (strcmp(type, "pct") == 0) {
+		printCurrentTime();
+	}
 }
 
 int main() {
-
-	DDRB = 0x03;
-	DDRD = 0xF0;
-
-
 	DDRB |= 1 << LED_OUT;
 	DDRB &= ~(1 << BUTTON1_IN);
 	DDRB &= ~(1 << BUTTON2_IN);
 	PORTB &= ~(1 << LED_OUT);
 
-		unsigned char UART_data;
-		uint8_t index = 0;
-		char str[16 + 1];
-		bool receivedCommand = false;
+	unsigned char UART_data;
+	uint8_t index = 0;
+	char str[16 + 1];
+	bool receivedCommand = false;
 
-		USART0_Init(UBRR_VALUE);
-
-		_delay_ms(200);
-		start();
-		sei();
+	uart_init(UBRR_VALUE);
+	_delay_ms(200);
+	lcd_init();
+	sei();
 
 	bool button1 = false;
 	bool button2 = false;
 
 	_delay_ms(200);
 	clearScreen();
-
 	displayEvent();
 
+	// az idozito megirasahoz ezt az oldalt hasznaltam:
+	// https://sites.google.com/site/qeewiki/books/avr-guide/timers-on-the-atmega328
 	OCR1A = 0x3D08;
-
 	TCCR1B |= (1 << WGM12);
-	// Mode 4, CTC on OCR1A
-
 	TIMSK1 |= (1 << OCIE1A);
-	//Set interrupt on compare match
-
 	TCCR1B |= (1 << CS12) | (1 << CS10);
 
 	while (1) {
 		receivedCommand = false;
-		if (GET_UART(&UART_data)) {
+		// ha erkezett adat, azt feldolgozzuk
+		if (get_uart_character(&UART_data)) {
 			if (UART_data == '\r') {
+				// ha megerkezett a lezaro karakter
 				receivedCommand = true;
 				str[index] = '\0';
 				index = 0;
 			} else {
+				// egyebkent belefuzzuk
 				str[index++] = UART_data;
 			}
 		}
 
+		// itt vizsgaljuk a gombok allapotat
 		button1 = (PINB & (1 << BUTTON1_IN)) && !button1;
 		button2 = (PINB & (1 << BUTTON2_IN)) && !button2;
 
@@ -287,10 +296,8 @@ int main() {
 	}
 }
 
-// https://sites.google.com/site/qeewiki/books/avr-guide/timers-on-the-atmega328
-ISR (TIMER1_COMPA_vect)
-{
-	// action to be done every 1 sec
-	// PORTB ^= 1 << LED_OUT;
+// a masodpercek itt porognek
+ISR (TIMER1_COMPA_vect) {
 	currentTime++;
+	setLedStatus();
 }

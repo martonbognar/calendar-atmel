@@ -15,7 +15,7 @@ volatile unsigned char  wp;                      /* write pointer */
 volatile unsigned char  rp;                      /* read pointer */
 volatile unsigned char  sin_num;                 /* data number in input buffer */
 
-void USART0_Init(unsigned int baud_set_value) {
+void uart_init(unsigned int baud_set_value) {
 	UBRR0H = (unsigned char)(baud_set_value>>8);
 	UBRR0L = (unsigned char)baud_set_value;
 
@@ -60,7 +60,7 @@ ISR(USART_RX_vect) 		// vételi interrupt rutin
 	}
 }
 
-unsigned char GET_UART(unsigned char * UARTvar)
+unsigned char get_uart_character(unsigned char * UARTvar)
 {
 	if (sin_num>0)
 	{
