@@ -14,8 +14,8 @@ volatile uint8_t readIndex;
 volatile uint8_t characterCount;
 
 void uartInit(unsigned int baud_set_value) {
-	UBRR0H = (unsigned char)(baud_set_value>>8);
-	UBRR0L = (unsigned char)baud_set_value;
+	UBRR0H = (unsigned char) (baud_set_value >> 8);
+	UBRR0L = (unsigned char) baud_set_value;
 
 	UCSR0A = 0x00;
 
@@ -27,19 +27,7 @@ void uartInit(unsigned int baud_set_value) {
 	readIndex = 0;
 }
 
-static volatile unsigned char uart_err;
-
 ISR(USART_RX_vect) {
-	char status;
-	status = UCSR0A; 	   		// a statust ki kell olvasni az adat elott!
-	if(status & (1<<FE0))
-	{
-		uart_err = 1<<FE0;
-	}
-	if(status & (1<<DOR0))
-	{
-		uart_err = 1<<DOR0;
-	}
 	inputBuffer[writeIndex] = UDR0;   // beolvasas
 	writeIndex = (writeIndex + 1) % bufferSize;	// korkoros pointer eltolasa
 	if (characterCount < bufferSize) {
