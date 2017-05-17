@@ -3,6 +3,7 @@
 #include <string.h>
 
 void getTimeRemainingString(Event event, char * buffer, uint32_t currentTime) {
+	// ha mar elmult az esemeny
 	if (event.startTime < currentTime) {
 		strcpy(buffer, "event has passed");
 		return;

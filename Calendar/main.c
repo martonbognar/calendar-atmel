@@ -194,6 +194,7 @@ bool removeEvent(char * command) {
 		}
 	}
 
+	// ha ki lett torolve egy esemeny, frissitjuk a kijelzest
 	if (removed) {
 		displayEvent();
 	}
@@ -240,7 +241,7 @@ int main() {
 	DDRB &= ~(1 << BUTTON2_IN);
 	PORTB &= ~(1 << LED_OUT);
 
-	char UART_data;
+	char receivedCharacter;
 	uint8_t index = 0;
 	char str[256];
 	bool receivedCommand = false;
@@ -267,15 +268,15 @@ int main() {
 	while (1) {
 		receivedCommand = false;
 		// ha erkezett adat, azt feldolgozzuk
-		if (getCharacterFromUart(&UART_data)) {
-			if (UART_data == '\r') {
+		if (getCharacterFromUart(&receivedCharacter)) {
+			if (receivedCharacter == '\r') {
 				// ha megerkezett a lezaro karakter
 				receivedCommand = true;
 				str[index] = '\0';
 				index = 0;
 			} else {
 				// egyebkent belefuzzuk
-				str[index++] = UART_data;
+				str[index++] = receivedCharacter;
 			}
 		}
 
