@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+// visszaadja a parameterkent kapott esemeny es idobelyeg alapjan a bufferbe a hatralevo idot szoveges formaban
 void getTimeRemainingString(Event event, char * buffer, uint32_t currentTime) {
 	// ha mar elmult az esemeny
 	if (event.startTime < currentTime) {
@@ -12,6 +13,7 @@ void getTimeRemainingString(Event event, char * buffer, uint32_t currentTime) {
 	sprintf(buffer, "remaining: %lu", remainingMinutes);
 }
 
+// visszateresi erteke megadja, hogy a parameterkent atvett esemeny az idobelyeg alapjan kozelinek szamit-e
 bool eventIsNear(Event event, uint32_t currentTime) {
 	if (event.startTime < currentTime) {
 		return false;

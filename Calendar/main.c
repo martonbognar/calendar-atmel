@@ -1,9 +1,13 @@
+// uart baud rateje
 #define BAUD (long)9600
-#define UBRR_VALUE  (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
+// scale
+#define UBRR_VALUE (unsigned int)((F_CPU/(16*BAUD)-1) & 0x0fff)
 
+// LCD-hez pinek
 #define rs PB0
 #define en PB1
 
+// maximalis esemenyszam es sorhossz
 #define MAX_EVENTS 8
 #define LINE_LENGTH 17
 
@@ -46,8 +50,6 @@ static uint32_t currentTime = 0;
 // globalis string buffer
 static char buffer[LINE_LENGTH];
 
-// a fuggvenyek leirasa megtalalhato a dokumentacioban,
-// de igyekeztem mindennek ertelmes neveket adni, hogy konnyen ertheto legyen
 void updateCurrentTime(char * command);
 void printCurrentTime(void);
 void pushButton1(void);
@@ -63,12 +65,14 @@ bool removeEvent(char * command);
 void removeAndReorder(uint8_t index);
 void processCommand(char * command);
 
+// frissiti az aktualis idot a command parameterben kapott parancs alapjan
 void updateCurrentTime(char * command) {
 	sscanf(command, "tim %lu", &currentTime);
 	setLedStatus();
 	printCurrentTime();
 }
 
+// kiirja az aktualis idot az lcdre
 void printCurrentTime(void) {
 	clearScreen();
 	sprintf(buffer, "tim: %lu", currentTime);
@@ -77,6 +81,7 @@ void printCurrentTime(void) {
 	displayEvent();
 }
 
+// meghivodik az elso gomb megnyomasakor (esemenyeket leptet)
 void pushButton1(void) {
 	if (eventCount == 0) {
 		displayEvent();
@@ -86,6 +91,7 @@ void pushButton1(void) {
 	displayEvent();
 }
 
+// masik gomb lenyomasa (kijelzesi mod valtasa)
 void pushButton2(void) {
 	if (displayMode == DISPLAY_STARTTIME) {
 		displayMode = DISPLAY_REMAINING;
@@ -96,6 +102,7 @@ void pushButton2(void) {
 	displayEvent();
 }
 
+// kezeli a ledet az esemenyek kozelsege alapjan
 void setLedStatus(void) {
 	if (oneEventIsNear()) {
 		// ha van kozeli esemeny, bekapcsoljuk a ledet
@@ -106,6 +113,7 @@ void setLedStatus(void) {
 	}
 }
 
+// a visszateresi erteke megmondja, hogy van-e kozeli esemeny
 bool oneEventIsNear(void) {
 	bool isNear = false;
 	for (uint8_t i = 0; i < eventCount; ++i) {
@@ -116,18 +124,21 @@ bool oneEventIsNear(void) {
 	return isNear;
 }
 
+// kiir egy parameterben kapott szoveget az lcd felso sorara
 void printTopRow(char * text) {
 	_delay_ms(200);
 	setTopRowActive();
 	displayText(text);
 }
 
+// kiir egy parameterben kapott szoveget az lcd also sorara
 void printBottomRow(char * text) {
 	_delay_ms(200);
 	setBottomRowActive();
 	displayText(text);
 }
 
+// kiirja az aktualis esemeny adatait az lcdre
 void displayEvent(void) {
 	clearScreen();
 
@@ -153,6 +164,7 @@ void displayEvent(void) {
 	}
 }
 
+// a parameterkent kapott `add` parancsbol osszeallit egy esemenyt, es visszaadja azt
 Event processBuilderString(char * command) {
 	char* temp;
 	char data[4][LINE_LENGTH];
@@ -174,6 +186,7 @@ Event processBuilderString(char * command) {
 	return event;
 }
 
+// hozzaad egy esemenyt a tombhoz a parameterkent kapott `add` parancs alapjan, visszateresi erteke megmondja, hogy sikeres volt-e (volt-e hely)
 bool addEvent(char * command) {
 	// nem adjuk hozza, ha mar nincs hely
 	if (eventCount == MAX_EVENTS)
@@ -184,6 +197,7 @@ bool addEvent(char * command) {
 	return true;
 }
 
+// kitorol egy esemenyt a parameterkent kapott `rmv` parancs alapjan, visszateresi erteke megmondja, hogy hajtodott-e vegre torles
 bool removeEvent(char * command) {
 	bool removed = false;
 	for (uint8_t i = 0; i < eventCount; ++i) {
@@ -202,6 +216,7 @@ bool removeEvent(char * command) {
 	return removed;
 }
 
+// kitorli a parameterben kapott indexu elemet a tombbol, a tobbit arrebb mozgatja
 void removeAndReorder(uint8_t index) {
 	for (uint8_t i = index; i < eventCount - 1; ++i) {
 		events[i] = events[i + 1];
@@ -213,6 +228,7 @@ void removeAndReorder(uint8_t index) {
 	}
 }
 
+// feldolgozza a parameterben kapott parancsot
 void processCommand(char * command) {
 	char type[4];
 	// minden parancs 3 karakteres azonositoval rendelkezik, azt vizsgaljuk
@@ -236,16 +252,19 @@ void processCommand(char * command) {
 }
 
 int main() {
+	// portok inicializalasa a ledhez es a gombokhoz
 	DDRB |= 1 << LED_OUT;
 	DDRB &= ~(1 << BUTTON1_IN);
 	DDRB &= ~(1 << BUTTON2_IN);
 	PORTB &= ~(1 << LED_OUT);
 
+	// uarton erkezo parancsok buffere es ahhoz tartozo valtozok
 	char receivedCharacter;
 	uint8_t index = 0;
-	char str[256];
+	char receiveBuffer[256];
 	bool receivedCommand = false;
 
+	// periferiak inicializalasa
 	uartInit(UBRR_VALUE);
 	_delay_ms(200);
 	lcdInit();
@@ -254,11 +273,12 @@ int main() {
 	bool button1 = false;
 	bool button2 = false;
 
+	// kepernyo torlese, esemenyek (alapesetben semmi) kiirasa
 	_delay_ms(200);
 	clearScreen();
 	displayEvent();
 
-	// az idozito megirasahoz ezt az oldalt hasznaltam:
+	// az idozito regiszterekhez ezt az oldalt hasznaltam segitsegul:
 	// https://sites.google.com/site/qeewiki/books/avr-guide/timers-on-the-atmega328
 	OCR1A = 0x3D08;
 	TCCR1B |= (1 << WGM12);
@@ -272,11 +292,11 @@ int main() {
 			if (receivedCharacter == '\r') {
 				// ha megerkezett a lezaro karakter
 				receivedCommand = true;
-				str[index] = '\0';
+				receiveBuffer[index] = '\0';
 				index = 0;
 			} else {
 				// egyebkent belefuzzuk
-				str[index++] = receivedCharacter;
+				receiveBuffer[index++] = receivedCharacter;
 			}
 		}
 
@@ -285,7 +305,7 @@ int main() {
 		button2 = (PINB & (1 << BUTTON2_IN)) && !button2;
 
 		if (receivedCommand) {
-			processCommand(str);
+			processCommand(receiveBuffer);
 		}
 
 		if (button1) {
@@ -298,8 +318,10 @@ int main() {
 	}
 }
 
-// a masodpercek itt porognek
+// ez a timer interrupt hivodik masodpercenkent
 ISR (TIMER1_COMPA_vect) {
+	// noveli a timestampet
 	currentTime++;
+	// majd meghivja a ledkezelo fuggvenyt
 	setLedStatus();
 }
